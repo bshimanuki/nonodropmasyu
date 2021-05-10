@@ -107,6 +107,7 @@ class Nonogram:
 		max_sols = 5
 		sols = 0
 		first = None
+		self.solver.push()
 		for i in range(max_sols):
 			check, solution = self.get_next()
 			if check != z3.sat:
@@ -114,6 +115,7 @@ class Nonogram:
 			sols += 1
 			if first is None:
 				first = solution
+		self.solver.pop()
 		print(f"{self.m}x{self.n} grid:")
 		for y, line in enumerate(self.cell_values):
 			print(''.join(BLOCKS[v.item()][0] for x, v in enumerate(line)))
@@ -121,6 +123,16 @@ class Nonogram:
 		if first is not None:
 			for y, line in enumerate(first):
 				print(''.join(BLOCKS[v.item()][(v != self.cell_values[y, x]).item()] for x, v in enumerate(line)))
+		locked = np.zeros_like(self.cell_values)
+		for idx, var in np.ndenumerate(self.cells):
+			self.solver.push()
+			self.solver.add(var != self.cell_values[idx].item())
+			locked[idx] = self.solver.check() == z3.unsat
+			self.solver.pop()
+		if first is not None:
+			print()
+			for y, line in enumerate(self.cell_values):
+				print(''.join(BLOCKS[v.item()][(v ^ ~locked[y, x]).item()] for x, v in enumerate(line)))
 
 
 def main():
