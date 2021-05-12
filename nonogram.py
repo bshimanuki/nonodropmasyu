@@ -1,3 +1,6 @@
+'''
+Determine uniqueness or alternative solutions to a nonogram.
+'''
 import sys
 
 import numpy as np
@@ -12,6 +15,9 @@ BLOCKS = [
 
 class Nonogram:
 	def __init__(self, s):
+		'''
+		s is tsv where blanks correspond to shaded nonogram cells.
+		'''
 		self.cell_values = np.array([[not s for s in line.split('\t')] for line in s.split('\n')], dtype=bool)
 		self.m, self.n = self.cell_values.shape
 		self.rows = []
@@ -77,16 +83,13 @@ class Nonogram:
 			]))
 
 		# check givens
+		constraints = np.equal(self.cells, self.cell_values, dtype=np.object).flatten().tolist()
 		self.solver.push()
-		self.solver.add(z3.And([
-			var == self.cell_values[y, x].item() for (y, x), var in np.ndenumerate(self.cells)
-		]))
+		self.solver.add(constraints)
 		assert self.solver.check() == z3.sat
 		self.solver.pop()
 
-		self.solver.add(z3.Not(z3.And([
-			var == self.cell_values[y, x].item() for (y, x), var in np.ndenumerate(self.cells)
-		])))
+		self.solver.add(z3.Not(z3.And(constraints)))
 
 	def get_next(self):
 		check = self.solver.check()
@@ -95,13 +98,12 @@ class Nonogram:
 		model = self.solver.model()
 		self.solver.add(z3.Not(z3.And([
 			var == model.eval(var, model_completion=True)
-			for _, var in np.ndenumerate(self.cells)
+			for var in self.cells.flat
 		])))
 		solution = np.zeros_like(self.cell_values)
 		for idx, var in np.ndenumerate(self.cells):
 			solution[idx] = model.eval(var, model_completion=True)
 		return check, solution
-
 
 	def run(self):
 		max_sols = 5
